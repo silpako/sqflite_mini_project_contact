@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sqflite_mini_project_contact/screens/4_colors.dart';
-import 'package:sqflite_mini_project_contact/screens/3_db_helper.dart';
+import 'package:sqflite_mini_project_contact/screens/3_db_helper.dart'; // Assuming this is your SQLHelper file
 import 'package:sqflite_mini_project_contact/screens/5_settings.dart';
 import 'package:sqflite_mini_project_contact/screens/6_privacy.dart';
-
-void main() {
-  runApp(MaterialApp(
-    home: NoteApp(),
-  ));
-}
 
 class NoteApp extends StatefulWidget {
   @override
@@ -18,19 +12,34 @@ class NoteApp extends StatefulWidget {
 
 class _NoteAppState extends State<NoteApp> {
   List<Map<String, dynamic>> notes = [];
+  List<Map<String, dynamic>> filteredNotes = [];
   bool isLoading = true;
+  final TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     refreshNotes();
+    searchController.addListener(_filterNotes);
   }
 
   Future<void> refreshNotes() async {
     final data = await SQLHelper.getNotes();
     setState(() {
       notes = data;
+      filteredNotes = data;
       isLoading = false;
+    });
+  }
+
+  void _filterNotes() {
+    final query = searchController.text.toLowerCase();
+    setState(() {
+      filteredNotes = notes.where((note) {
+        final noteTitle = note['title'].toLowerCase();
+        final noteContent = note['note'].toLowerCase();
+        return noteTitle.contains(query) || noteContent.contains(query);
+      }).toList();
     });
   }
 
@@ -39,13 +48,16 @@ class _NoteAppState extends State<NoteApp> {
     return Scaffold(
       backgroundColor: MyColors.scaffoldColor,
       appBar: AppBar(
+        elevation: 0,
         backgroundColor: MyColors.ThemeColor,
         title: Text(
           'My Notes',
-          style: GoogleFonts.bonaNova(fontWeight: FontWeight.bold),
+          style: GoogleFonts.bonaNova(
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
-          IconButton(onPressed: () {}, icon: Icon(Icons.search)),
           Container(
             width: 30,
             height: 30,
@@ -85,27 +97,53 @@ class _NoteAppState extends State<NoteApp> {
             }),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(60.0),
+          child: Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              width: double.infinity,
+              height: 40,
+              child: TextField(
+                controller: searchController,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: "Search",
+                  hintStyle: GoogleFonts.bonaNova(),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: MyColors.ThemeColor,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
           : ListView.builder(
-              itemCount: notes.length,
+              itemCount: filteredNotes.length,
               itemBuilder: (context, index) => Card(
                 margin: EdgeInsets.all(10),
                 child: ListTile(
-                  title: Text(notes[index]['title']),
-                  subtitle: Text(notes[index]['note']),
-                  onTap: () => showNoteDetailDialog(notes[index]),
+                  title: Text(filteredNotes[index]['title']),
+                  subtitle: Text(filteredNotes[index]['note']),
+                  onTap: () => showNoteDetailDialog(filteredNotes[index]),
                   trailing: Wrap(
                     children: [
                       IconButton(
                           icon: Icon(Icons.edit),
                           onPressed: () =>
-                              showNoteDialog(id: notes[index]['id'])),
+                              showNoteDialog(id: filteredNotes[index]['id'])),
                       IconButton(
                           icon: Icon(Icons.delete),
                           onPressed: () =>
-                              deleteNoteDialog(notes[index]['id'])),
+                              deleteNoteDialog(filteredNotes[index]['id'])),
                     ],
                   ),
                 ),
@@ -288,7 +326,13 @@ class _NoteAppState extends State<NoteApp> {
               refreshNotes();
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Note deleted successfully')),
+                SnackBar(
+                  content: Text(
+                    'Note deleted successfully',
+                    style: GoogleFonts.bonaNova(),
+                  ),
+                  backgroundColor: MyColors.ThemeColor,
+                ),
               );
             },
             child: Text(
